@@ -1,0 +1,6 @@
+﻿Implement in app -
+  PAK Extraction
+  XML Decoder - Material/Character Defs etc#
+  Texture Combiner - 
+    find a way to convert normal maps, or call Noesis to do it
+  If possible, model conversion, or we'll call cgf-converter
