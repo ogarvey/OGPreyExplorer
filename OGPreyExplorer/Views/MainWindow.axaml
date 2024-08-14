@@ -7,16 +7,16 @@
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="OGPreyExplorer.Views.MainWindow"
         Icon="/Assets/avalonia-logo.ico"
+        TransparencyLevelHint="AcrylicBlur"
+        Background="Transparent"
         Title="OGPreyExplorer">
 	<Grid ColumnDefinitions="1*,3*">
 		<views:FileExplorer Grid.Column="0" />
 		<Grid Grid.Column="1" RowDefinitions="1*,3*">
 			<WrapPanel Margin="5,10" >
-        <Button Name="BtnCgfExport" Content="Convert CGF" Click="Cgf_OnClick"/>
-				<Button Content="Extract PAK" />
-				<Button Content="Convert Textures" />
-				<Button Content="Convert MTL" />
-				<Button Content="Convert All" />
+				<Button Margin="5,0,5,0" Content="Extract PAK" Click="Pak_OnClick" />
+				<Button Margin="0,0,5,0" Name="BtnCgfExport" Content="Convert CGF" Click="Cgf_OnClick"/>
+				<Button Content="Recombine Textures" />
       </WrapPanel>
     </Grid>
 	</Grid>

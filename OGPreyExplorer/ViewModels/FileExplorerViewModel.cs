@@ -13,6 +13,7 @@ using Avalonia.Data.Converters;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using OGPreyExplorer.Models;
+using OGPreyExplorer.Services;
 using ReactiveUI;
 
 namespace OGPreyExplorer.ViewModels
@@ -21,35 +22,29 @@ namespace OGPreyExplorer.ViewModels
   {
     private static IconConverter? s_iconConverter;
     private bool _cellSelection;
-    private FileTreeNodeModel? _root;
-    private string _selectedDrive;
-    private string? _highlightedPath;
+    private FileTreeNodeModel? _gameSdkRoot;
+    private FileTreeNodeModel? _gameFilesRoot;
 
-    public FileExplorerViewModel()
+    private string _selectedGameSDKPath;
+    private string _extractedFilesPath;
+    private string? _highlightedPakPath;
+    private string? _highlightedOutputPath;
+    private List<FileTreeNodeModel> _highlightedOutputItems;
+
+    private readonly ConfigService _configService;
+
+    public FileExplorerViewModel(ConfigService configService)
     {
+      _configService = configService;
       Drives = DriveInfo.GetDrives().Select(x => x.Name).ToList();
 
-      if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-      {
-        _selectedDrive = "C:\\";
-      }
-      else
-      {
-        _selectedDrive = Drives.FirstOrDefault() ?? "/";
-      }
+      _selectedGameSDKPath = _configService.Config.PreyPakFolder ?? (Drives.FirstOrDefault() ?? "/");
+      _extractedFilesPath = _configService.Config.ExportFolder ?? (Drives.FirstOrDefault() ?? "/");
 
-      Source = new HierarchicalTreeDataGridSource<FileTreeNodeModel>(Array.Empty<FileTreeNodeModel>())
+      PakFilesSource = new HierarchicalTreeDataGridSource<FileTreeNodeModel>(Array.Empty<FileTreeNodeModel>())
       {
         Columns =
                 {
-                    new CheckBoxColumn<FileTreeNodeModel>(
-                        null,
-                        x => x.IsChecked,
-                        (o, v) => o.IsChecked = v,
-                        options: new()
-                        {
-                            CanUserResizeColumn = false,
-                        }),
                     new HierarchicalExpanderColumn<FileTreeNodeModel>(
                         new TemplateColumn<FileTreeNodeModel>(
                             "Name",
@@ -74,26 +69,56 @@ namespace OGPreyExplorer.ViewModels
                             CompareAscending = FileTreeNodeModel.SortAscending(x => long.Parse(x.Size)),
                             CompareDescending = FileTreeNodeModel.SortDescending(x => long.Parse(x.Size)),
                         }),
-                    new TextColumn<FileTreeNodeModel, DateTimeOffset?>(
-                        "Modified",
-                        x => x.Modified,
+                }
+      };
+      GameFilesSource = new HierarchicalTreeDataGridSource<FileTreeNodeModel>(Array.Empty<FileTreeNodeModel>())
+      {
+        Columns =
+                {
+                    new HierarchicalExpanderColumn<FileTreeNodeModel>(
+                        new TemplateColumn<FileTreeNodeModel>(
+                            "Name",
+                            "FileNameCell",
+                            "FileNameEditCell",
+                            new GridLength(1, GridUnitType.Star),
+                            new()
+                            {
+                                CompareAscending = FileTreeNodeModel.SortAscending(x => x.Name),
+                                CompareDescending = FileTreeNodeModel.SortDescending(x => x.Name),
+                                IsTextSearchEnabled = true,
+                                TextSearchValueSelector = x => x.Name
+                            }),
+                        x => x.Children,
+                        x => x.HasChildren,
+                        x => x.IsExpanded),
+                    new TextColumn<FileTreeNodeModel, string?>(
+                        "Size",
+                        x => x.Size,
                         options: new()
                         {
-                            CompareAscending = FileTreeNodeModel.SortAscending(x => x.Modified),
-                            CompareDescending = FileTreeNodeModel.SortDescending(x => x.Modified),
+                            CompareAscending = FileTreeNodeModel.SortAscending(x => long.Parse(x.Size)),
+                            CompareDescending = FileTreeNodeModel.SortDescending(x => long.Parse(x.Size)),
                         }),
                 }
       };
+      PakFilesSource.RowSelection!.SingleSelect = false;
+      PakFilesSource.RowSelection.SelectionChanged += SelectionChanged;
 
-      Source.RowSelection!.SingleSelect = false;
-      Source.RowSelection.SelectionChanged += SelectionChanged;
+      GameFilesSource.RowSelection!.SingleSelect = false;
+      GameFilesSource.RowSelection.SelectionChanged += GameFileSelectionChanged;
 
-      this.WhenAnyValue(x => x.SelectedDrive)
+      this.WhenAnyValue(x => x.SelectedGameSDKPath)
           .Subscribe(x =>
           {
-            _root = new FileTreeNodeModel(_selectedDrive, isDirectory: true, isRoot: true);
-            Source.Items = new[] { _root };
+            _gameSdkRoot = new FileTreeNodeModel(_selectedGameSDKPath, isDirectory: true, isRoot: true);
+            PakFilesSource.Items = new[] { _gameSdkRoot };
           });
+      this.WhenAnyValue(x => x.ExtractedFilesPath)
+        .Subscribe(x =>
+        {
+          _gameFilesRoot = new FileTreeNodeModel(_extractedFilesPath, isDirectory: true, isRoot: true);
+          GameFilesSource.Items = new[] { _gameFilesRoot };
+        });
     }
 
     public bool CellSelection
@@ -105,9 +130,9 @@ namespace OGPreyExplorer.ViewModels
         {
           _cellSelection = value;
           if (_cellSelection)
-            Source.Selection = new TreeDataGridCellSelectionModel<FileTreeNodeModel>(Source) { SingleSelect = false };
+            PakFilesSource.Selection = new TreeDataGridCellSelectionModel<FileTreeNodeModel>(PakFilesSource) { SingleSelect = false };
           else
-            Source.Selection = new TreeDataGridRowSelectionModel<FileTreeNodeModel>(Source) { SingleSelect = false };
+            PakFilesSource.Selection = new TreeDataGridRowSelectionModel<FileTreeNodeModel>(PakFilesSource) { SingleSelect = false };
           this.RaisePropertyChanged();
         }
       }
@@ -115,19 +140,38 @@ namespace OGPreyExplorer.ViewModels
 
     public IList<string> Drives { get; }
 
-    public string SelectedDrive
+    public string SelectedGameSDKPath
     {
-      get => _selectedDrive;
-      set => this.RaiseAndSetIfChanged(ref _selectedDrive, value);
+      get => _selectedGameSDKPath;
+      set => this.RaiseAndSetIfChanged(ref _selectedGameSDKPath, value);
     }
 
-    public string? HighlightedPath
+    public string ExtractedFilesPath
     {
-      get => _highlightedPath;
-      set => SetHighlightedPath(value);
+      get => _extractedFilesPath;
+      set => this.RaiseAndSetIfChanged(ref _extractedFilesPath, value);
     }
 
-    public HierarchicalTreeDataGridSource<FileTreeNodeModel> Source { get; }
+    public string? HighlightedPakPath
+    {
+      get => _highlightedPakPath;
+      set => SetHighlightedPath(value, true);
+    }
+
+    public string? HighlightedOutputPath
+    {
+      get => _highlightedOutputPath;
+      set => this.SetHighlightedPath(value, false);
+    }
+
+    public List<FileTreeNodeModel> HighlightedOutputItems
+    {
+      get => _highlightedOutputItems;
+      set => this.RaiseAndSetIfChanged(ref _highlightedOutputItems, value);
+    }
+
+    public HierarchicalTreeDataGridSource<FileTreeNodeModel> PakFilesSource { get; }
+    public HierarchicalTreeDataGridSource<FileTreeNodeModel> GameFilesSource { get; }
 
     public static IMultiValueConverter FileIconConverter
     {
@@ -151,11 +195,18 @@ namespace OGPreyExplorer.ViewModels
       }
     }
 
-    private void SetHighlightedPath(string? value)
+    private void SetHighlightedPath(string? value, bool isPakSource)
     {
       if (string.IsNullOrEmpty(value))
       {
-        Source.RowSelection!.Clear();
+        if (isPakSource)
+        {
+          PakFilesSource.RowSelection!.Clear();
+        }
+        else
+        {
+          GameFilesSource.RowSelection!.Clear();
+        }
         return;
       }
 
@@ -188,9 +239,13 @@ namespace OGPreyExplorer.ViewModels
         var driveIndex = Drives.ToList().FindIndex(x => string.Equals(x, drive, StringComparison.OrdinalIgnoreCase));
 
         if (driveIndex >= 0)
-          SelectedDrive = Drives[driveIndex];
+        {
+          if (isPakSource) SelectedGameSDKPath = Drives[driveIndex];
+          else ExtractedFilesPath = Drives[driveIndex];
+        }
 
-        FileTreeNodeModel? node = _root;
+
+        FileTreeNodeModel? node = isPakSource ? _gameSdkRoot : _gameFilesRoot;
         index = new IndexPath(0);
 
         while (node is not null && components.Count > 0)
@@ -204,18 +259,33 @@ namespace OGPreyExplorer.ViewModels
         }
       }
 
-      Source.RowSelection!.SelectedIndex = index;
+      if (isPakSource)
+      {
+        PakFilesSource.RowSelection!.Select(index);
+      }
+      else
+      {
+        GameFilesSource.RowSelection!.Select(index);
+      }
+    }
+
+    private void GameFileSelectionChanged(object? sender, TreeSelectionModelSelectionChangedEventArgs<FileTreeNodeModel> e)
+    {
+      var highlightedPath = GameFilesSource.RowSelection?.SelectedItem?.Path;
+      var highlightedItems = GameFilesSource.RowSelection?.SelectedItems?.ToList();
+      this.RaiseAndSetIfChanged(ref _highlightedOutputPath, highlightedPath, nameof(HighlightedOutputPath));
+      this.RaiseAndSetIfChanged(ref _highlightedOutputItems, highlightedItems, nameof(HighlightedOutputItems));
     }
 
     private void SelectionChanged(object? sender, TreeSelectionModelSelectionChangedEventArgs<FileTreeNodeModel> e)
     {
-      var highlightedPath = Source.RowSelection?.SelectedItem?.Path;
-      this.RaiseAndSetIfChanged(ref _highlightedPath, highlightedPath, nameof(HighlightedPath));
+      var highlightedPath = PakFilesSource.RowSelection?.SelectedItem?.Path;
+      this.RaiseAndSetIfChanged(ref _highlightedPakPath, highlightedPath, nameof(HighlightedPakPath));
 
-      foreach (var i in e.DeselectedItems)
-        System.Diagnostics.Trace.WriteLine($"Deselected '{i?.Path}'");
-      foreach (var i in e.SelectedItems)
-        System.Diagnostics.Trace.WriteLine($"Selected '{i?.Path}'");
+      //foreach (var i in e.DeselectedItems)
+      //  System.Diagnostics.Trace.WriteLine($"Deselected '{i?.Path}'");
+      //foreach (var i in e.SelectedItems)
+      //  System.Diagnostics.Trace.WriteLine($"Selected '{i?.Path}'");
     }
 
     private class IconConverter : IMultiValueConverter
