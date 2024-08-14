@@ -133,7 +133,7 @@ public partial class MainWindow : Window
           if (ext == ".cgf" || ext == ".skin" || ext == ".chr")
           {
             var argsHandler = new ArgsHandler();
-            var args = new string[] { ext == ".skinm" ? skinmPath : file.Path, "-noconflict", "-gltf", "-objectDir", @"C:\Dev\Projects\Gaming\VGR\PC\Prey\MAIN" };
+            var args = new string[] { ext == ".skinm" ? skinmPath : file.Path, "-noconflict", "-gltf", "-objectDir", _configService.Config.ExportFolder! };
             var numErrorsOccurred = argsHandler.ProcessArgs(args);
             var data = new CryEngine(file.Path, argsHandler.PackFileSystem, materialFiles: argsHandler.MaterialFile);
 
