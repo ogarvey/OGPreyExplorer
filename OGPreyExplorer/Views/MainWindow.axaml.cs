@@ -99,10 +99,18 @@ public partial class MainWindow : Window
         if (File.Exists(file.Path))
         {
           var ext = Path.GetExtension(file.Path);
-          if (ext == ".cgf" || ext == ".skin" || ext == ".skinm")
+          string skinmPath = "";
+          if (ext == ".skinm")
+          {
+            // copy file and rename to .cgf
+            var cgfPath = Path.ChangeExtension(file.Path, ".cgf");
+            File.Copy(file.Path, cgfPath, overwrite: true);
+            skinmPath = cgfPath;
+          }
+          if (ext == ".cgf" || ext == ".skin" || ext == ".chr")
           {
             var argsHandler = new ArgsHandler();
-            var args = new string[] { file.Path, "-noconflict", "-gltf", "-objectDir", @"C:\Dev\Projects\Gaming\VGR\PC\Prey\MAIN" };
+            var args = new string[] { ext == ".skinm" ? skinmPath : file.Path, "-noconflict", "-gltf", "-objectDir", @"C:\Dev\Projects\Gaming\VGR\PC\Prey\MAIN" };
             var numErrorsOccurred = argsHandler.ProcessArgs(args);
             var data = new CryEngine(file.Path, argsHandler.PackFileSystem, materialFiles: argsHandler.MaterialFile);
 
