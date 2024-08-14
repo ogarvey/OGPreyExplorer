@@ -76,7 +76,8 @@ public partial class MainWindow : Window
         // extract the .zip to to the path specified in the config
         var extPath = _configService.Config.ExportFolder;
 
-        if (extPath != null) { 
+        if (extPath != null)
+        {
           var extDir = Path.Combine(extPath, Path.GetFileNameWithoutExtension(pakPath));
           Directory.CreateDirectory(extDir);
           ZipFile.ExtractToDirectory(zipPath, extDir, overwriteFiles: true);
@@ -85,7 +86,29 @@ public partial class MainWindow : Window
         }
 
       }
-    }  
+    }
+  }
+
+  private async void ParseXML_OnClick(object? sender, RoutedEventArgs e)
+  {
+    var items = ((FileExplorerViewModel)DataContext!).HighlightedOutputItems;
+    // filter to .mtl files for now
+    if (items != null)
+    {
+      foreach (var file in items)
+      {
+        if (File.Exists(file.Path))
+        {
+          var data = File.ReadAllBytes(file.Path);
+
+          if (CryXmlSerializer.IsBinaryXml(data))
+          {
+            var xmlContent = await CryXmlSerializer.ReadFileAsync(data);
+            cryXmlBlock.Text = xmlContent;
+          }
+        }
+      }
+    }
   }
 
   private void Cgf_OnClick(object? sender, RoutedEventArgs e)

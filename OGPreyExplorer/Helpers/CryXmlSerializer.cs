@@ -16,11 +16,10 @@ public class CryXmlSerializer
   private static readonly byte[] PbxmlMagic = Encoding.UTF8.GetBytes("pbxml\0");
   private static readonly byte[] CryXmlMagic = Encoding.UTF8.GetBytes("CryXmlB\0");
 
-  public static async Task<string> ReadFileAsync(string filePath)
+  public static async Task<string> ReadFileAsync(byte[] fileBuffer)
   {
     try
     {
-      byte[] fileBuffer = await File.ReadAllBytesAsync(filePath);
       string xmlContent = await ProcessDataAsync(fileBuffer);
 
       XmlDocument doc = new XmlDocument();
@@ -282,28 +281,17 @@ public class CryXmlSerializer
     return BitConverter.ToInt32(buffer, offset);
   }
 
-  static (string, int) ReadCString(byte[] buffer, int offset)
+  private static (string, int) ReadCString(byte[] buffer, int offset)
   {
-    // Check if there's enough space in the buffer to read the string length
-    if (offset + 4 > buffer.Length)
+    int end = offset;
+
+    while (buffer[end] != 0x00 && end < buffer.Length)
     {
-      throw new ArgumentOutOfRangeException(nameof(offset), "Not enough bytes in buffer to read the string length.");
+      end++;
     }
 
-    // Read the length of the string
-    int length = BitConverter.ToInt32(buffer, offset);
-
-    // Check if there's enough space in the buffer to read the string data
-    if (offset + 4 + length > buffer.Length)
-    {
-      throw new ArgumentOutOfRangeException(nameof(offset), "Not enough bytes in buffer to read the string data.");
-    }
-
-    // Decode the string data using UTF-8 encoding
-    string data = Encoding.UTF8.GetString(buffer, offset + 4, length);
-
-    // Return the decoded string and the new offset
-    return (data, 4 + length);
+    string str = Encoding.UTF8.GetString(buffer, offset, end - offset);
+    return (str, end - offset + 1);
   }
   // ... (Rest of the methods: loadCryXmlBFileAsync, loadPbxmlFileAsync, 
   //      readCryXmlHeaderInfo, buildCryXmlNodeTable, buildCryXmlAttributeTable, 

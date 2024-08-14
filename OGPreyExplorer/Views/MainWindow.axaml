@@ -10,14 +10,20 @@
         TransparencyLevelHint="AcrylicBlur"
         Background="Transparent"
         Title="OGPreyExplorer">
-	<Grid ColumnDefinitions="1*,3*">
+	<Grid ColumnDefinitions="1*,5,*">
 		<views:FileExplorer Grid.Column="0" />
-		<Grid Grid.Column="1" RowDefinitions="1*,3*">
-			<WrapPanel Margin="5,10" >
+		<GridSplitter Grid.Column="1" Width="5" Background="Gray" />
+		<Grid Grid.Column="2" RowDefinitions="Auto,5,5*">
+			<WrapPanel Grid.Row="0" Margin="5,10" >
 				<Button Margin="5,0,5,0" Content="Extract PAK" Click="Pak_OnClick" />
 				<Button Margin="0,0,5,0" Name="BtnCgfExport" Content="Convert CGF" Click="Cgf_OnClick"/>
+        <Button Margin="0,0,5,0" Name="BtnXmlParse" Content="Parse XML" Click="ParseXML_OnClick"/>
 				<Button Content="Recombine Textures" />
       </WrapPanel>
+      <GridSplitter Grid.Row="1" Height="5" Background="Gray" VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
+			<ScrollViewer Grid.Row="2">
+				<TextBlock x:Name="cryXmlBlock"  Margin="15,10" Text="Welcome to OGPreyExplorer!" VerticalAlignment="Top"/>
+			</ScrollViewer>
     </Grid>
 	</Grid>
 </Window>
